@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { type Assessment, type AssessmentQuestion } from '../../lib/api';
 
 interface AssessmentPreviewProps {
     assessment: Assessment;
 }
 
-function QuestionPreview({ question }: { question: AssessmentQuestion }) {
-    const [value, setValue] = useState<any>('');
+function QuestionPreview({ question, answers, onAnswer }: { question: AssessmentQuestion; answers: Record<string, any>; onAnswer: (id: string, value: any) => void }) {
+    const value = answers[question.id];
 
     const renderQuestion = () => {
         switch (question.type) {
@@ -20,7 +20,7 @@ function QuestionPreview({ question }: { question: AssessmentQuestion }) {
                                     name={`question-${question.id}`}
                                     value={option}
                                     checked={value === option}
-                                    onChange={(e) => setValue(e.target.value)}
+                                    onChange={(e) => onAnswer(question.id, e.target.value)}
                                     className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
                                 />
                                 <span className="ml-2 text-sm text-gray-700">{option}</span>
@@ -40,9 +40,9 @@ function QuestionPreview({ question }: { question: AssessmentQuestion }) {
                                     onChange={(e) => {
                                         const currentValues = Array.isArray(value) ? value : [];
                                         if (e.target.checked) {
-                                            setValue([...currentValues, option]);
+                                            onAnswer(question.id, [...currentValues, option]);
                                         } else {
-                                            setValue(currentValues.filter((v: string) => v !== option));
+                                            onAnswer(question.id, currentValues.filter((v: string) => v !== option));
                                         }
                                     }}
                                     className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
@@ -57,8 +57,8 @@ function QuestionPreview({ question }: { question: AssessmentQuestion }) {
                 return (
                     <input
                         type="text"
-                        value={value}
-                        onChange={(e) => setValue(e.target.value)}
+                        value={value || ''}
+                        onChange={(e) => onAnswer(question.id, e.target.value)}
                         maxLength={question.maxLength}
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                         placeholder="Enter your answer"
@@ -68,8 +68,8 @@ function QuestionPreview({ question }: { question: AssessmentQuestion }) {
             case 'long-text':
                 return (
                     <textarea
-                        value={value}
-                        onChange={(e) => setValue(e.target.value)}
+                        value={value || ''}
+                        onChange={(e) => onAnswer(question.id, e.target.value)}
                         rows={4}
                         maxLength={question.maxLength}
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
@@ -81,8 +81,8 @@ function QuestionPreview({ question }: { question: AssessmentQuestion }) {
                 return (
                     <input
                         type="number"
-                        value={value}
-                        onChange={(e) => setValue(e.target.value)}
+                        value={value || ''}
+                        onChange={(e) => onAnswer(question.id, e.target.value)}
                         min={question.min}
                         max={question.max}
                         className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
@@ -118,7 +118,7 @@ function QuestionPreview({ question }: { question: AssessmentQuestion }) {
                                         id={`file-${question.id}`}
                                         type="file"
                                         className="sr-only"
-                                        onChange={(e) => setValue(e.target.files?.[0]?.name || '')}
+                                        onChange={(e) => onAnswer(question.id, e.target.files?.[0]?.name || '')}
                                     />
                                 </label>
                                 <p className="pl-1">or drag and drop</p>
@@ -157,6 +157,70 @@ function QuestionPreview({ question }: { question: AssessmentQuestion }) {
 }
 
 export default function AssessmentPreview({ assessment }: AssessmentPreviewProps) {
+    const [answers, setAnswers] = useState<Record<string, any>>({});
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const isVisible = (q: AssessmentQuestion): boolean => {
+        const logic = q.conditionalLogic;
+        if (!logic || !logic.dependsOn) return true;
+        const dependsValue = answers[logic.dependsOn];
+        switch (logic.condition) {
+            case 'equals':
+                return Array.isArray(dependsValue)
+                    ? dependsValue.includes(logic.value)
+                    : dependsValue === logic.value;
+            case 'not-equals':
+                return Array.isArray(dependsValue)
+                    ? !dependsValue.includes(logic.value)
+                    : dependsValue !== logic.value;
+            case 'contains':
+                return Array.isArray(dependsValue)
+                    ? dependsValue.includes(logic.value)
+                    : typeof dependsValue === 'string' && String(dependsValue).includes(logic.value);
+            default:
+                return true;
+        }
+    };
+
+    const handleAnswer = (id: string, value: any) => {
+        setAnswers(prev => ({ ...prev, [id]: value }));
+    };
+
+    const validate = (): boolean => {
+        const nextErrors: Record<string, string> = {};
+        for (const section of assessment.sections) {
+            for (const q of section.questions) {
+                if (!isVisible(q)) continue;
+                const v = answers[q.id];
+                if (q.required) {
+                    if (q.type === 'multi-choice') {
+                        if (!Array.isArray(v) || v.length === 0) nextErrors[q.id] = 'This field is required';
+                    } else if (v === undefined || v === null || v === '') {
+                        nextErrors[q.id] = 'This field is required';
+                    }
+                }
+                if (q.type === 'numeric' && v !== undefined && v !== '') {
+                    const num = Number(v);
+                    if (!Number.isFinite(num)) nextErrors[q.id] = 'Enter a valid number';
+                    if (q.min !== undefined && num < q.min) nextErrors[q.id] = `Must be ≥ ${q.min}`;
+                    if (q.max !== undefined && num > q.max) nextErrors[q.id] = `Must be ≤ ${q.max}`;
+                }
+                if ((q.type === 'text' || q.type === 'long-text') && q.maxLength && typeof v === 'string') {
+                    if (v.length > q.maxLength) nextErrors[q.id] = `Max length is ${q.maxLength}`;
+                }
+            }
+        }
+        setErrors(nextErrors);
+        return Object.keys(nextErrors).length === 0;
+    };
+
+    const visibleSections = useMemo(() => {
+        return assessment.sections.map(section => ({
+            ...section,
+            questions: section.questions.filter(isVisible),
+        }));
+    }, [assessment, answers]);
+
     return (
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
             <div className="px-4 py-5 sm:px-6">
@@ -178,7 +242,7 @@ export default function AssessmentPreview({ assessment }: AssessmentPreviewProps
                     </div>
 
                     {/* Sections */}
-                    {assessment.sections.map((section, sectionIndex) => (
+                    {visibleSections.map((section, sectionIndex) => (
                         <div key={section.id} className="space-y-6">
                             <div className="border-b border-gray-200 pb-4">
                                 <h2 className="text-lg font-medium text-gray-900">
@@ -198,7 +262,10 @@ export default function AssessmentPreview({ assessment }: AssessmentPreviewProps
                                                 {sectionIndex + 1}.{questionIndex + 1}
                                             </span>
                                         </div>
-                                        <QuestionPreview question={question} />
+                                        <QuestionPreview question={question} answers={answers} onAnswer={handleAnswer} />
+                                        {errors[question.id] && (
+                                            <p className="mt-2 text-xs text-red-600">{errors[question.id]}</p>
+                                        )}
                                     </div>
                                 ))}
                                 {section.questions.length === 0 && (
@@ -217,17 +284,15 @@ export default function AssessmentPreview({ assessment }: AssessmentPreviewProps
                     )}
 
                     {/* Submit Button */}
-                    {assessment.sections.length > 0 && assessment.sections.some(s => s.questions.length > 0) && (
+                    {visibleSections.length > 0 && visibleSections.some(s => s.questions.length > 0) && (
                         <div className="pt-6 border-t border-gray-200">
                             <button
-                                disabled
-                                className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-400 cursor-not-allowed"
+                                onClick={() => validate()}
+                                className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
                             >
-                                Submit Assessment (Preview Mode)
+                                Validate Assessment (Preview)
                             </button>
-                            <p className="mt-2 text-xs text-gray-500 text-center">
-                                This is a preview. The submit button is disabled.
-                            </p>
+                            <p className="mt-2 text-xs text-gray-500 text-center">Preview mode does not submit responses.</p>
                         </div>
                     )}
                 </div>

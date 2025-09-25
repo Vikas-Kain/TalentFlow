@@ -256,10 +256,62 @@ export default function QuestionBuilder({ question, onUpdate, onDelete }: Questi
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Conditional Logic (Advanced)
                         </label>
-                        <div className="text-sm text-gray-500 p-3 bg-gray-100 rounded-md">
-                            <p>Conditional logic allows questions to appear based on previous answers.</p>
-                            <p className="mt-1">This feature will be implemented in the next iteration.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">Depends On (Question ID)</label>
+                                <input
+                                    type="text"
+                                    value={question.conditionalLogic?.dependsOn || ''}
+                                    onChange={(e) => onUpdate({
+                                        ...question,
+                                        conditionalLogic: {
+                                            dependsOn: e.target.value,
+                                            condition: question.conditionalLogic?.condition || 'equals',
+                                            value: question.conditionalLogic?.value || ''
+                                        }
+                                    })}
+                                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                                    placeholder="e.g., q1"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">Condition</label>
+                                <select
+                                    value={question.conditionalLogic?.condition || 'equals'}
+                                    onChange={(e) => onUpdate({
+                                        ...question,
+                                        conditionalLogic: {
+                                            dependsOn: question.conditionalLogic?.dependsOn || '',
+                                            condition: e.target.value as any,
+                                            value: question.conditionalLogic?.value || ''
+                                        }
+                                    })}
+                                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                                >
+                                    <option value="equals">Equals</option>
+                                    <option value="not-equals">Not Equals</option>
+                                    <option value="contains">Contains</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-600 mb-1">Value</label>
+                                <input
+                                    type="text"
+                                    value={question.conditionalLogic?.value || ''}
+                                    onChange={(e) => onUpdate({
+                                        ...question,
+                                        conditionalLogic: {
+                                            dependsOn: question.conditionalLogic?.dependsOn || '',
+                                            condition: question.conditionalLogic?.condition || 'equals',
+                                            value: e.target.value
+                                        }
+                                    })}
+                                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                                    placeholder="Target value"
+                                />
+                            </div>
                         </div>
+                        <p className="mt-2 text-xs text-gray-500">Questions without conditional settings are always shown.</p>
                     </div>
                 </div>
             )}

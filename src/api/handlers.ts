@@ -70,11 +70,29 @@ export const handlers = [
         }
 
         const body = await request.json() as Partial<Job>;
+        if (!body.title || body.title.trim().length === 0) {
+            return HttpResponse.json({ error: 'Title is required' }, { status: 400 });
+        }
+
+        const slugify = (title: string) => title
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
+
+        const baseSlug = slugify(body.title);
+        let slugCandidate = baseSlug;
+        let suffix = 2;
+        while (await db.jobs.where('slug').equals(slugCandidate).first()) {
+            slugCandidate = `${baseSlug}-${suffix++}`;
+        }
         const maxOrder = await db.jobs.orderBy('order').last();
 
         const newJob: Job = {
             id: `job-${Date.now()}`,
             title: body.title || '',
+            slug: slugCandidate,
             description: body.description || '',
             status: body.status || 'active',
             tags: body.tags || [],
@@ -86,6 +104,17 @@ export const handlers = [
         await db.jobs.add(newJob);
 
         return HttpResponse.json(newJob, { status: 201 });
+    }),
+
+    http.get('/api/jobs/:id', async ({ params }) => {
+        await delay(100 + Math.random() * 400);
+        const { id } = params;
+        const job = await db.jobs.get(id as string);
+
+        if (!job) {
+            return new HttpResponse(null, { status: 404 });
+        }
+        return HttpResponse.json(job);
     }),
 
     http.patch('/api/jobs/:id', async ({ request, params }) => {
@@ -115,6 +144,27 @@ export const handlers = [
             updatedAt: new Date().toISOString()
         };
 
+        // If title changes, regenerate slug and ensure uniqueness
+        if (body.title && body.title.trim() && body.title !== existingJob.title) {
+            const slugify = (title: string) => title
+                .toLowerCase()
+                .trim()
+                .replace(/[^a-z0-9\s-]/g, '')
+                .replace(/\s+/g, '-')
+                .replace(/-+/g, '-');
+            const baseSlug = slugify(body.title);
+            let slugCandidate = baseSlug;
+            let suffix = 2;
+            // Ensure slug is unique excluding current job
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const conflict = await db.jobs.where('slug').equals(slugCandidate).first();
+                if (!conflict || conflict.id === existingJob.id) break;
+                slugCandidate = `${baseSlug}-${suffix++}`;
+            }
+            (updatedJob as any).slug = slugCandidate;
+        }
+
         await db.jobs.update(id as string, updatedJob);
 
         return HttpResponse.json(updatedJob);
@@ -131,7 +181,7 @@ export const handlers = [
         }
 
         const { id } = params;
-        const body = await request.json() as { newOrder: number };
+        const body = await request.json() as { fromOrder: number; toOrder: number };
 
         const job = await db.jobs.get(id as string);
         if (!job) {
@@ -141,10 +191,26 @@ export const handlers = [
             );
         }
 
-        // Update the job's order
-        await db.jobs.update(id as string, {
-            order: body.newOrder,
-            updatedAt: new Date().toISOString()
+        const fromOrder = body.fromOrder;
+        const toOrder = body.toOrder;
+
+        await db.transaction('rw', db.jobs, async () => {
+            const all = await db.jobs.toArray();
+            // Shift range
+            if (fromOrder < toOrder) {
+                for (const j of all) {
+                    if (j.order > fromOrder && j.order <= toOrder) {
+                        await db.jobs.update(j.id, { order: j.order - 1, updatedAt: new Date().toISOString() });
+                    }
+                }
+            } else if (fromOrder > toOrder) {
+                for (const j of all) {
+                    if (j.order >= toOrder && j.order < fromOrder) {
+                        await db.jobs.update(j.id, { order: j.order + 1, updatedAt: new Date().toISOString() });
+                    }
+                }
+            }
+            await db.jobs.update(id as string, { order: toOrder, updatedAt: new Date().toISOString() });
         });
 
         return HttpResponse.json({ success: true });
@@ -179,8 +245,11 @@ export const handlers = [
         const endIndex = startIndex + pageSize;
         const paginatedCandidates = candidates.slice(startIndex, endIndex);
 
+        // Map internal currentStage to API field stage
+        const normalized = paginatedCandidates.map(c => ({ ...c, stage: c.currentStage }));
+
         return HttpResponse.json({
-            data: paginatedCandidates,
+            data: normalized,
             pagination: {
                 page,
                 pageSize,
@@ -200,14 +269,14 @@ export const handlers = [
             );
         }
 
-        const body = await request.json() as Partial<Candidate>;
+        const body = await request.json() as Partial<Candidate> & { stage?: string };
 
         const newCandidate: Candidate = {
             id: `candidate-${Date.now()}`,
             name: body.name || '',
             email: body.email || '',
             phone: body.phone,
-            currentStage: body.currentStage || 'applied',
+            currentStage: (body as any).stage || body.currentStage || 'applied',
             jobId: body.jobId || '',
             appliedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -216,12 +285,12 @@ export const handlers = [
 
         await db.candidates.add(newCandidate);
 
-        return HttpResponse.json(newCandidate, { status: 201 });
+        return HttpResponse.json({ ...newCandidate, stage: newCandidate.currentStage }, { status: 201 });
     }),
 
     http.patch('/api/candidates/:id', async ({ request, params }) => {
         const { id } = params;
-        const updates = await request.json() as Partial<Candidate>;
+        const updates = await request.json() as Partial<Candidate> & { stage?: string };
 
         // Simulate potential server error
         if (Math.random() < 0.1) { // 10% chance of failure
@@ -235,6 +304,7 @@ export const handlers = [
         try {
             const updatedCount = await db.candidates.update(id as string, {
                 ...updates,
+                currentStage: (updates as any).stage || updates.currentStage,
                 updatedAt: new Date().toISOString(),
             });
 
@@ -243,15 +313,16 @@ export const handlers = [
             }
 
             // Add a timeline event for the stage change
-            if (updates.currentStage) {
+            const newStage = (updates as any).stage || updates.currentStage;
+            if (newStage) {
                 await db.timelineEvents.add({
                     id: `timeline-${Date.now()}`,
                     candidateId: id as string,
                     type: 'stage_change',
-                    description: `Moved to ${updates.currentStage}`,
+                    description: `Moved to ${newStage}`,
                     timestamp: new Date().toISOString(),
                     metadata: {
-                        newStage: updates.currentStage,
+                        newStage,
                     },
                 });
             }
@@ -259,13 +330,40 @@ export const handlers = [
             const updatedCandidate = await db.candidates.get(id as string);
 
             await delay(400);
-            return HttpResponse.json(updatedCandidate);
+            return HttpResponse.json({ ...updatedCandidate!, stage: updatedCandidate!.currentStage });
         } catch (error) {
             return new HttpResponse(JSON.stringify({ message: 'Database error' }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' },
             });
         }
+    }),
+
+    http.post('/api/candidates/:id/notes', async ({ request, params }) => {
+        await delay(300 + Math.random() * 400);
+        if (shouldSimulateError()) {
+            return new HttpResponse(null, { status: 500 });
+        }
+
+        const { id } = params;
+        const { content } = await request.json() as { content: string };
+
+        // Ensure candidate exists
+        const candidate = await db.candidates.get(id as string);
+        if (!candidate) {
+            return new HttpResponse(null, { status: 404 });
+        }
+
+        const timelineEvent: TimelineEvent = {
+            id: `timeline-${Date.now()}`,
+            candidateId: id as string,
+            type: 'note_added',
+            description: content,
+            timestamp: new Date().toISOString(),
+            metadata: { note: content },
+        };
+        await db.timelineEvents.add(timelineEvent);
+        return HttpResponse.json(timelineEvent, { status: 201 });
     }),
 
     http.get('/api/candidates/:id/timeline', async ({ params }) => {

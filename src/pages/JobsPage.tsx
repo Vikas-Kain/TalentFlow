@@ -47,8 +47,8 @@ export default function JobsPage() {
     );
 
     const reorderMutation = useMutation({
-        mutationFn: ({ id, newOrder }: { id: string; newOrder: number }) =>
-            api.reorderJob(id, newOrder),
+        mutationFn: ({ id, fromOrder, toOrder }: { id: string; fromOrder: number; toOrder: number }) =>
+            api.reorderJob(id, fromOrder, toOrder),
         onMutate: async (newOrderData) => {
             // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
             await queryClient.cancelQueries({ queryKey: ['jobs'] });
@@ -60,7 +60,8 @@ export default function JobsPage() {
             queryClient.setQueryData(['jobs', { search, status: statusFilter, page: currentPage, sort: sortBy }], (oldData: any) => {
                 if (!oldData) return oldData;
                 const oldIndex = oldData.data.findIndex((job: Job) => job.id === newOrderData.id);
-                const newIndex = newOrderData.newOrder;
+                const newIndex = (newOrderData as any).toOrderIndex as number | undefined;
+                if (newIndex === undefined || newIndex === null) return oldData;
                 if (oldIndex === -1) return oldData;
 
                 const reorderedJobs = arrayMove(oldData.data, oldIndex, newIndex);
@@ -104,7 +105,11 @@ export default function JobsPage() {
 
             if (oldIndex !== -1 && newIndex !== -1 && data?.data) {
                 const jobToUpdate = data.data[oldIndex];
-                reorderMutation.mutate({ id: jobToUpdate.id, newOrder: newIndex });
+                const targetJob = data.data[newIndex];
+                // Use absolute order values for server
+                reorderMutation.mutate({ id: jobToUpdate.id, fromOrder: jobToUpdate.order, toOrder: targetJob.order } as any);
+                // Provide index for optimistic UI move
+                (reorderMutation as any).variables = { toOrderIndex: newIndex };
             }
         }
     };
@@ -220,7 +225,6 @@ export default function JobsPage() {
                                     <JobCard
                                         key={job.id}
                                         job={job}
-                                        onReorder={() => { }} // Not used in individual cards
                                         onStatusToggle={handleStatusToggle}
                                         isReordering={reorderMutation.isPending}
                                     />

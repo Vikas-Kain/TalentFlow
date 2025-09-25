@@ -1,30 +1,37 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { api } from '../lib/api';
 import CandidatesKanban from '../features/candidates/CandidatesKanban';
+// If list view component exists, import it; else keep only Kanban
+// import CandidatesListVirtual from '../features/candidates/CandidatesListVirtual';
 
 export default function CandidatesPage() {
+    const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
     const [search, setSearch] = useState('');
     const [stageFilter, setStageFilter] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
 
-    const { data, isLoading, error } = useQuery({
-        queryKey: ['candidates', { search, stage: stageFilter, page: currentPage }],
-        queryFn: () => api.getCandidates({
-            search,
-            stage: stageFilter,
-            page: currentPage,
-            pageSize: 50
-        }),
+    const { data: candidatesResponse, isLoading, error } = useQuery({
+        // The query key should only depend on the server-side filter
+        queryKey: ['candidates', { stage: stageFilter }],
+        // The API call should not include the client-side search term
+        queryFn: () => api.getCandidates({ stage: stageFilter }),
     });
 
-    if (error) {
-        return (
-            <div className="text-center py-12">
-                <p className="text-red-600">Error loading candidates: {error.message}</p>
-            </div>
+    // useMemo will re-compute the filtered list only when data or search term changes
+    const filteredCandidates = useMemo(() => {
+        const candidatesData = candidatesResponse?.data || [];
+        if (!search) return candidatesData;
+
+        const lowercasedSearch = search.toLowerCase();
+        return candidatesData.filter(candidate =>
+            candidate.name.toLowerCase().includes(lowercasedSearch) ||
+            candidate.email.toLowerCase().includes(lowercasedSearch)
         );
+    }, [candidatesResponse, search]);
+
+    if (error) {
+        return <div className="text-center py-12 text-red-600">Error: {error.message}</div>;
     }
 
     return (
@@ -72,7 +79,6 @@ export default function CandidatesPage() {
                         onClick={() => {
                             setSearch('');
                             setStageFilter('');
-                            setCurrentPage(1);
                         }}
                         className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                     >
@@ -82,32 +88,34 @@ export default function CandidatesPage() {
                 </div>
             </div>
 
-            {/* Candidates List */}
-            <CandidatesKanban
-                candidates={data?.data || []}
-                isLoading={isLoading}
-            />
+            {/* View Mode Toggle */}
+            <div className="flex space-x-2">
+                <button
+                    onClick={() => setViewMode('kanban')}
+                    className={`flex-1 px-4 py-2 rounded-md font-medium text-sm focus:outline-none transition-all ${viewMode === 'kanban'
+                        ? 'bg-primary-600 text-white shadow-md'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                >
+                    Kanban View
+                </button>
+                <button
+                    onClick={() => setViewMode('list')}
+                    className={`flex-1 px-4 py-2 rounded-md font-medium text-sm focus:outline-none transition-all ${viewMode === 'list'
+                        ? 'bg-primary-600 text-white shadow-md'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                >
+                    List View
+                </button>
+            </div>
 
-            {/* Pagination */}
-            {data?.pagination && data.pagination.totalPages > 1 && (
-                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                    <div className="flex-1 flex justify-between sm:hidden">
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                            disabled={currentPage === 1}
-                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Previous
-                        </button>
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(data.pagination.totalPages, prev + 1))}
-                            disabled={currentPage === data.pagination.totalPages}
-                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Next
-                        </button>
-                    </div>
-                </div>
+            {isLoading ? (
+                <div className="text-center p-6"><p>Loading candidates...</p></div>
+            ) : viewMode === 'kanban' ? (
+                <CandidatesKanban candidates={filteredCandidates} />
+            ) : (
+                <div className="text-center text-gray-500 p-6">List view component not available.</div>
             )}
         </div>
     );

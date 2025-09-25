@@ -198,7 +198,7 @@ export default function AssessmentBuilder() {
 
     const saveMutation = useMutation({
         mutationFn: (assessmentData: Partial<Assessment>) =>
-            api.saveAssessment(jobId!, assessmentData),
+            api.updateAssessment(jobId!, assessmentData as Assessment),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['assessment', jobId] });
             toast.success('Assessment saved successfully');

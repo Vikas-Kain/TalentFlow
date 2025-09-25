@@ -25,6 +25,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
     return response.json() as Promise<T>;
 }
 
+// Use TimelineEvent from db schema
+
 export const api = {
     async getJobs(params: { search?: string; status?: string; page?: number; pageSize?: number; sort?: string }): Promise<PaginatedResponse<Job>> {
         const queryParams = new URLSearchParams();
@@ -38,7 +40,12 @@ export const api = {
         return handleResponse<PaginatedResponse<Job>>(response);
     },
 
-    async createJob(job: Omit<Job, 'id' | 'createdAt' | 'updatedAt' | 'order'>): Promise<Job> {
+    async getJob(id: string): Promise<Job> {
+        const response = await fetch(`/api/jobs/${id}`);
+        return handleResponse<Job>(response);
+    },
+
+    async createJob(job: Omit<Job, 'id' | 'slug' | 'createdAt' | 'updatedAt' | 'order'>): Promise<Job> {
         const response = await fetch('/api/jobs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -56,22 +63,24 @@ export const api = {
         return handleResponse<Job>(response);
     },
 
-    async reorderJob(id: string, newOrder: number): Promise<Job> {
+    async reorderJob(id: string, fromOrder: number, toOrder: number): Promise<{ success: boolean }> {
         const response = await fetch(`/api/jobs/${id}/reorder`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ newOrder })
+            body: JSON.stringify({ fromOrder, toOrder })
         });
-        return handleResponse<Job>(response);
+        return handleResponse<{ success: boolean }>(response);
     },
 
-    async getCandidates(params: { search?: string; stage?: string }): Promise<Candidate[]> {
+    async getCandidates(params: { search?: string; stage?: string; page?: number; pageSize?: number }): Promise<{ data: (Candidate & { stage: Candidate['currentStage'] })[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
         const queryParams = new URLSearchParams();
         if (params.search) queryParams.set('search', params.search);
         if (params.stage) queryParams.set('stage', params.stage);
+        if (params.page) queryParams.set('page', String(params.page));
+        if (params.pageSize) queryParams.set('pageSize', String(params.pageSize));
 
         const response = await fetch(`/api/candidates?${queryParams.toString()}`);
-        return handleResponse<Candidate[]>(response);
+        return handleResponse(response);
     },
 
     async getCandidate(id: string): Promise<Candidate> {
@@ -79,13 +88,13 @@ export const api = {
         return handleResponse<Candidate>(response);
     },
 
-    async updateCandidate(id: string, candidate: Partial<Candidate>): Promise<Candidate> {
+    async updateCandidate(id: string, candidate: Partial<Candidate> & { stage?: Candidate['currentStage'] }): Promise<Candidate & { stage: Candidate['currentStage'] }> {
         const response = await fetch(`/api/candidates/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(candidate)
         });
-        return handleResponse<Candidate>(response);
+        return handleResponse(response);
     },
 
     async getCandidateTimeline(id: string): Promise<TimelineEvent[]> {
@@ -97,7 +106,7 @@ export const api = {
         const response = await fetch(`/api/candidates/${id}/notes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(note)
+            body: JSON.stringify(note),
         });
         return handleResponse<TimelineEvent>(response);
     },

@@ -3,6 +3,7 @@ import Dexie, { type Table } from 'dexie';
 export interface Job {
     id: string;
     title: string;
+    slug: string;
     description: string;
     status: 'active' | 'archived';
     tags: string[];
@@ -93,6 +94,42 @@ export class TalentFlowDB extends Dexie {
             assessmentResponses: 'id, assessmentId, candidateId, submittedAt, status',
             timelineEvents: 'id, candidateId, type, timestamp'
         });
+        // v2 adds slug and an index on it
+        this.version(2)
+            .stores({
+                jobs: 'id, slug, title, status, order, createdAt, updatedAt',
+                candidates: 'id, name, email, currentStage, jobId, appliedAt, updatedAt',
+                assessments: 'id, jobId, title, createdAt, updatedAt',
+                assessmentResponses: 'id, assessmentId, candidateId, submittedAt, status',
+                timelineEvents: 'id, candidateId, type, timestamp'
+            })
+            .upgrade(async (tx) => {
+                const jobsTable = tx.table<Job>('jobs');
+                const jobs = await jobsTable.toArray();
+                const slugify = (title: string) => title
+                    .toLowerCase()
+                    .trim()
+                    .replace(/[^a-z0-9\s-]/g, '')
+                    .replace(/\s+/g, '-')
+                    .replace(/-+/g, '-');
+
+                // Backfill slug if missing
+                for (const job of jobs) {
+                    if (!(job as any).slug) {
+                        const base = slugify(job.title);
+                        let candidate = base || `job-${job.id}`;
+                        let suffix = 2;
+                        // ensure uniqueness
+                        // eslint-disable-next-line no-await-in-loop
+                        while (await jobsTable.where('slug').equals(candidate).first()) {
+                            candidate = `${base}-${suffix++}`;
+                        }
+                        (job as any).slug = candidate;
+                        // eslint-disable-next-line no-await-in-loop
+                        await jobsTable.put(job);
+                    }
+                }
+            });
     }
 }
 
@@ -145,6 +182,13 @@ export async function seedDatabase() {
         'Part-time', 'Contract', 'Senior', 'Junior', 'Mid-level', 'Frontend', 'Backend'
     ];
 
+    const slugify = (title: string) => title
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+
     for (let i = 0; i < 25; i++) {
         const isActive = Math.random() > 0.3; // 70% active jobs
         const jobTags = tags.sort(() => 0.5 - Math.random()).slice(0, Math.floor(Math.random() * 5) + 2);
@@ -152,6 +196,7 @@ export async function seedDatabase() {
         jobs.push({
             id: `job-${i + 1}`,
             title: jobTitles[i],
+            slug: slugify(jobTitles[i]) + (i > 0 ? `-${i + 1}` : ''),
             description: `We are looking for a talented ${jobTitles[i].toLowerCase()} to join our team. This role involves working on exciting projects and collaborating with a diverse team of professionals.`,
             status: isActive ? 'active' : 'archived',
             tags: jobTags,
@@ -205,7 +250,7 @@ export async function seedDatabase() {
 
     await db.candidates.bulkAdd(candidates);
 
-    // Generate 3 sample assessments
+    // Generate 3 sample assessments (expanded)
     const assessments: Assessment[] = [
         {
             id: 'assessment-1',
@@ -251,6 +296,27 @@ export async function seedDatabase() {
                             required: false,
                             order: 3,
                             maxLength: 500
+                        },
+                        {
+                            id: 'q11',
+                            type: 'single-choice',
+                            title: 'Have you used React Query?',
+                            required: true,
+                            order: 4,
+                            options: ['Yes', 'No']
+                        },
+                        {
+                            id: 'q12',
+                            type: 'text',
+                            title: 'If yes, what features did you use?',
+                            required: false,
+                            order: 5,
+                            maxLength: 300,
+                            conditionalLogic: {
+                                dependsOn: 'q11',
+                                condition: 'equals',
+                                value: 'Yes'
+                            }
                         }
                     ]
                 },
@@ -280,6 +346,21 @@ export async function seedDatabase() {
                                 'Ask team members for help immediately',
                                 'Research similar issues online first'
                             ]
+                        },
+                        {
+                            id: 'q13',
+                            type: 'multi-choice',
+                            title: 'Which performance tools have you used?',
+                            required: false,
+                            order: 2,
+                            options: ['Lighthouse', 'React Profiler', 'WebPageTest', 'Bundle Analyzer']
+                        },
+                        {
+                            id: 'q14',
+                            type: 'file',
+                            title: 'Upload a code sample (optional)',
+                            required: false,
+                            order: 3
                         }
                     ]
                 }
@@ -314,6 +395,44 @@ export async function seedDatabase() {
                             required: true,
                             order: 1,
                             options: ['PostgreSQL', 'MongoDB', 'MySQL', 'Redis', 'SQLite', 'DynamoDB']
+                        },
+                        {
+                            id: 'q15',
+                            type: 'numeric',
+                            title: 'Years of experience with REST APIs',
+                            required: true,
+                            order: 2,
+                            min: 0,
+                            max: 30
+                        },
+                        {
+                            id: 'q16',
+                            type: 'text',
+                            title: 'Describe your experience with authentication/authorization',
+                            required: true,
+                            order: 3,
+                            maxLength: 500
+                        },
+                        {
+                            id: 'q17',
+                            type: 'single-choice',
+                            title: 'Have you used message queues?',
+                            required: true,
+                            order: 4,
+                            options: ['Yes', 'No']
+                        },
+                        {
+                            id: 'q18',
+                            type: 'text',
+                            title: 'If yes, which ones?',
+                            required: false,
+                            order: 5,
+                            maxLength: 200,
+                            conditionalLogic: {
+                                dependsOn: 'q17',
+                                condition: 'equals',
+                                value: 'Yes'
+                            }
                         }
                     ]
                 }
@@ -347,6 +466,35 @@ export async function seedDatabase() {
                             title: 'Upload your portfolio (PDF or images)',
                             required: true,
                             order: 1
+                        },
+                        {
+                            id: 'q19',
+                            type: 'text',
+                            title: 'Link to your design case study',
+                            required: false,
+                            order: 2,
+                            maxLength: 300
+                        },
+                        {
+                            id: 'q20',
+                            type: 'single-choice',
+                            title: 'Have you conducted user research?',
+                            required: true,
+                            order: 3,
+                            options: ['Yes', 'No']
+                        },
+                        {
+                            id: 'q21',
+                            type: 'long-text',
+                            title: 'Describe your research process',
+                            required: false,
+                            order: 4,
+                            maxLength: 800,
+                            conditionalLogic: {
+                                dependsOn: 'q20',
+                                condition: 'equals',
+                                value: 'Yes'
+                            }
                         }
                     ]
                 }

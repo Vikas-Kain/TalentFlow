@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { api, type Job } from '../../lib/api';
+import { api } from '../../lib/api';
 import { useUIStore } from '../../store/ui';
 import toast from 'react-hot-toast';
 
@@ -25,9 +25,7 @@ export default function JobModal() {
 
     const { data: existingJob } = useQuery({
         queryKey: ['job', selectedJobId],
-        queryFn: () => selectedJobId ? api.getJobs().then(jobs =>
-            jobs.data.find((job: Job) => job.id === selectedJobId)
-        ) : null,
+        queryFn: () => selectedJobId ? api.getJob(selectedJobId) : Promise.resolve(null),
         enabled: !!selectedJobId && isJobModalOpen,
     });
 
@@ -49,7 +47,7 @@ export default function JobModal() {
     });
 
     const createMutation = useMutation({
-        mutationFn: (data: JobFormData) => api.createJob(data),
+        mutationFn: (data: JobFormData) => api.createJob({ ...data, tags: data.tags || [] }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['jobs'] });
             toast.success('Job created successfully');

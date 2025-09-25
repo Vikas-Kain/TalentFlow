@@ -4,15 +4,15 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toaster } from 'react-hot-toast';
 
 // Pages
-import JobsPage from './pages/JobsPage.tsx';
-import JobDetailPage from './pages/JobDetailPage.tsx';
-import CandidatesPage from './pages/CandidatesPage.tsx';
-import CandidateDetailPage from './pages/CandidateDetailPage.tsx';
-import AssessmentPage from './pages/AssessmentPage.tsx';
+import JobsPage from './pages/JobsPage';
+import JobDetailPage from './pages/JobDetailPage';
+import CandidatesPage from './pages/CandidatesPage';
+import CandidateDetailPage from './pages/CandidateDetailPage';
+import AssessmentPage from './pages/AssessmentPage';
 
 // Components
-import Layout from './components/Layout.tsx';
-import { ErrorBoundary } from './components/ErrorBoundary.tsx';
+import Layout from './components/Layout';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -34,11 +34,11 @@ function App() {
               <ErrorBoundary>
                 <Routes>
                   <Route path="/" element={<Navigate to="/jobs" replace />} />
-                  <Route path="/jobs" element={<JobsPage />} />
-                  <Route path="/jobs/:jobId" element={<JobDetailPage />} />
-                  <Route path="/jobs/:jobId/assessment" element={<AssessmentPage />} />
-                  <Route path="/candidates" element={<CandidatesPage />} />
-                  <Route path="/candidates/:candidateId" element={<CandidateDetailPage />} />
+                  <Route path="jobs" element={<JobsPage />} />
+                  <Route path="jobs/:jobId" element={<JobDetailPage />} />
+                  <Route path="jobs/:jobId/assessment" element={<AssessmentPage />} />
+                  <Route path="candidates" element={<CandidatesPage />} />
+                  <Route path="candidates/:candidateId" element={<CandidateDetailPage />} />
                 </Routes>
               </ErrorBoundary>
             </Layout>

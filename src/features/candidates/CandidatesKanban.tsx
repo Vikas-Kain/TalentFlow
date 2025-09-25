@@ -146,15 +146,18 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
         { id: string; candidate: Partial<Candidate> },
         { previousCandidates?: Candidate[] }
     >({
-        mutationFn: ({ id, candidate }) => api.updateCandidate(id, candidate),
+        mutationFn: ({ id, candidate }) => api.updateCandidate(id, { ...candidate, stage: candidate.currentStage as any }),
         onMutate: async ({ id, candidate }) => {
             await queryClient.cancelQueries({ queryKey: ['candidates'] });
             const previousCandidates = queryClient.getQueryData<Candidate[]>(['candidates']);
 
             // Optimistically update the cache
-            queryClient.setQueryData<Candidate[]>(['candidates'], (old = []) =>
-                old.map(c => c.id === id ? { ...c, ...candidate } : c)
-            );
+            queryClient.setQueryData<any>(['candidates'], (old: any) => {
+                if (!old) return old;
+                const list = Array.isArray(old) ? old : old.data;
+                const updated = list.map((c: Candidate) => c.id === id ? { ...c, ...candidate } : c);
+                return Array.isArray(old) ? updated : { ...old, data: updated };
+            });
             return { previousCandidates };
         },
         onError: (_err, _vars, context) => {
@@ -202,7 +205,7 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
         setActiveCandidate(null);
 
         if (!over) return;
-        
+
         const originalStage = active.data.current?.candidate.currentStage;
         const newStage = over.data.current?.sortable?.containerId ?? over.id;
 
