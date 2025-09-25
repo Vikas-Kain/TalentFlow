@@ -1,4 +1,4 @@
-import { useState, useMemo, type ReactNode, useEffect } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
@@ -9,7 +9,6 @@ import {
     useSensors,
     type DragEndEvent,
     type DragStartEvent,
-    type DragOverEvent,
     DragOverlay,
     useDroppable,
 } from '@dnd-kit/core';
@@ -103,8 +102,8 @@ function CandidateCard({ candidate, isOverlay = false }: { candidate: Candidate,
     );
 }
 
-function DroppableColumn({ id, children, isOver }: { id: string; children: ReactNode, isOver: boolean }) {
-    const { setNodeRef } = useDroppable({ id });
+function DroppableColumn({ id, children }: { id: string; children: ReactNode }) {
+    const { setNodeRef, isOver } = useDroppable({ id });
     return (
         <div
             ref={setNodeRef}
@@ -117,19 +116,14 @@ function DroppableColumn({ id, children, isOver }: { id: string; children: React
 
 export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) {
     const queryClient = useQueryClient();
-    const [internalCandidates, setInternalCandidates] = useState<Candidate[]>([]);
     const [activeCandidate, setActiveCandidate] = useState<Candidate | null>(null);
-
-    useEffect(() => {
-        setInternalCandidates(candidates);
-    }, [candidates]);
 
     const candidatesByStage = useMemo(() => {
         return stages.reduce((acc, stage) => {
-            acc[stage.id] = internalCandidates.filter(c => c.currentStage === stage.id);
+            acc[stage.id] = candidates.filter(c => c.currentStage === stage.id);
             return acc;
         }, {} as Record<string, Candidate[]>);
-    }, [internalCandidates]);
+    }, [candidates]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -146,18 +140,15 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
         { id: string; candidate: Partial<Candidate> },
         { previousCandidates?: Candidate[] }
     >({
-        mutationFn: ({ id, candidate }) => api.updateCandidate(id, { ...candidate, stage: candidate.currentStage as any }),
+        mutationFn: ({ id, candidate }) => api.updateCandidate(id, candidate),
         onMutate: async ({ id, candidate }) => {
             await queryClient.cancelQueries({ queryKey: ['candidates'] });
             const previousCandidates = queryClient.getQueryData<Candidate[]>(['candidates']);
 
-            // Optimistically update the cache
-            queryClient.setQueryData<any>(['candidates'], (old: any) => {
-                if (!old) return old;
-                const list = Array.isArray(old) ? old : old.data;
-                const updated = list.map((c: Candidate) => c.id === id ? { ...c, ...candidate } : c);
-                return Array.isArray(old) ? updated : { ...old, data: updated };
-            });
+            queryClient.setQueryData<Candidate[]>(['candidates'], (old = []) =>
+                old.map(c => (c.id === id ? { ...c, ...candidate } : c))
+            );
+
             return { previousCandidates };
         },
         onError: (_err, _vars, context) => {
@@ -173,48 +164,36 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
 
     const handleDragStart = (event: DragStartEvent) => {
         const { active } = event;
-        const candidate = internalCandidates.find(c => c.id === active.id);
+        const candidate = candidates.find(c => c.id === active.id);
         if (candidate) {
             setActiveCandidate(candidate);
         }
     };
 
-    const handleDragOver = (event: DragOverEvent) => {
+    const handleDragEnd = (event: DragEndEvent) => {
+        setActiveCandidate(null);
         const { active, over } = event;
-        if (!over || active.id === over.id) return;
 
-        const activeId = active.id.toString();
-        const overId = over.id.toString();
+        if (!over) {
+            return;
+        }
 
         const activeContainer = active.data.current?.sortable.containerId;
-        const overContainer = over.data.current?.sortable?.containerId ?? overId;
+        const overContainer = over.data.current?.sortable?.containerId ?? over.id;
 
-        if (activeContainer && overContainer && activeContainer !== overContainer) {
-            setInternalCandidates(prev => {
-                const activeIndex = prev.findIndex(c => c.id === activeId);
-                if (activeIndex === -1) return prev;
-                const newItems = [...prev];
-                newItems[activeIndex] = { ...newItems[activeIndex], currentStage: overContainer as Candidate['currentStage'] };
-                return newItems;
-            });
+        if (!activeContainer || !overContainer || activeContainer === overContainer) {
+            return;
         }
-    };
+        
+        const candidateId = active.id.toString();
+        const newStage = overContainer as Candidate['currentStage'];
+        
+        const originalCandidate = active.data.current?.candidate as Candidate | undefined;
 
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        setActiveCandidate(null);
-
-        if (!over) return;
-
-        const originalStage = active.data.current?.candidate.currentStage;
-        const newStage = over.data.current?.sortable?.containerId ?? over.id;
-
-        if (originalStage !== newStage) {
-            const candidateId = active.id.toString();
-            // Trigger the mutation only when the stage has changed
+        if (originalCandidate && originalCandidate.currentStage !== newStage) {
             updateCandidateMutation.mutate({
                 id: candidateId,
-                candidate: { currentStage: newStage as Candidate['currentStage'] },
+                candidate: { currentStage: newStage },
             });
         }
     };
@@ -224,13 +203,12 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             onDragCancel={() => setActiveCandidate(null)}
         >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 {stages.map((stage) => (
-                    <DroppableColumn key={stage.id} id={stage.id} isOver={false /* Placeholder */}>
+                    <DroppableColumn key={stage.id} id={stage.id}>
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-sm font-medium text-gray-900">{stage.name}</h3>
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white text-gray-600">
