@@ -2,7 +2,7 @@
 
 A modern, full-featured hiring platform built with React, TypeScript, and cutting-edge frontend technologies. TalentFlow provides a comprehensive solution for managing jobs, candidates, and assessments in a single, intuitive interface.
 
-## 🚀 Features
+## Features
 
 ### Jobs Management
 - **Drag-and-Drop Reordering**: Intuitive job list management with optimistic updates and rollback on errors
@@ -11,18 +11,18 @@ A modern, full-featured hiring platform built with React, TypeScript, and cuttin
 - **Pagination**: Efficient handling of large job lists with server-side pagination simulation
 
 ### Candidates Management
-- **Virtualized Lists**: High-performance rendering of 1000+ candidates using TanStack Virtual
-- **Kanban Board**: Visual candidate pipeline with drag-and-drop stage management
-- **Dual View Modes**: Switch between list and kanban views for different workflows
+- **Kanban Board**: Visual candidate pipeline with drag-and-drop stage management (single view)
+- **High-volume Data**: 1,000+ seeded candidates with client search and stage filtering
 - **Detailed Profiles**: Comprehensive candidate information with timeline tracking
-- **Notes System**: Add and manage candidate notes with real-time updates
+- **Notes System**: Add notes with @mentions (rendered) and local suggestions
 
 ### Assessment Builder
 - **Live Preview**: Side-by-side builder and preview for real-time assessment creation
-- **Multiple Question Types**: Support for single-choice, multi-choice, text, long-text, numeric, and file upload questions
-- **Drag-and-Drop Sections**: Reorderable sections and questions with visual feedback
-- **Validation Rules**: Configurable required fields, length limits, and numeric ranges
-- **Conditional Logic**: Framework for conditional questions (foundation implemented)
+- **Multiple Question Types**: Single-choice, multi-choice, short text, long text, numeric (min/max), and a file upload stub
+- **Drag-and-Drop**: Reorder sections and questions with visual feedback
+- **Validation Rules**: Required fields, max length, numeric ranges enforced at runtime
+- **Conditional Logic**: Show/hide questions based on prior answers (e.g. show QX if QY === "Yes")
+- **Local Persistence**: Builder state and candidate responses are stored in IndexedDB (via MSW + Dexie)
 
 ## 🛠 Technology Stack
 
@@ -54,19 +54,6 @@ A modern, full-featured hiring platform built with React, TypeScript, and cuttin
 
 ## 🏗 Architecture & Technical Decisions
 
-### Feature-Based Structure
-The application follows a feature-based architecture for scalability and maintainability:
-
-```
-src/
-├── /api/           # Data layer (MSW + Dexie)
-├── /components/    # Shared UI components
-├── /features/      # Feature-specific components and logic
-├── /hooks/         # Reusable custom hooks
-├── /lib/           # Utilities and type definitions
-├── /pages/         # Top-level page components
-└── /store/         # Global state management
-```
 
 ### Why These Technologies?
 
@@ -80,7 +67,7 @@ src/
 
 **Zustand**: Lightweight alternative to Redux for simple global state. Perfect for managing modal visibility and UI state without the complexity of Redux.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js 18+ 
@@ -115,7 +102,7 @@ src/
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix ESLint errors
 
-## 📱 Usage
+## Usage
 
 ### Jobs Management
 1. Navigate to the Jobs page to view all available positions
@@ -126,21 +113,19 @@ src/
 6. Use the action buttons to view details, edit, or archive jobs
 
 ### Candidates Management
-1. Go to the Candidates page to see all applicants
-2. Toggle between List and Kanban views
-3. In Kanban view, drag candidates between stages to update their status
-4. Use the search bar to find specific candidates
-5. Click on a candidate to view their detailed profile
-6. Add notes and track timeline events
+1. Go to the Candidates page to see all applicants (Kanban only)
+2. Drag candidates between stages to update their status (optimistic with rollback)
+3. Use the search bar to find specific candidates; filter by stage
+4. Click on a candidate to view the profile, timeline, and add notes with @mentions
 
 ### Assessment Builder
-1. Navigate to a job's assessment page
-2. Create sections and add questions of various types
-3. Use the live preview to see how the assessment will appear
-4. Configure validation rules and question options
-5. Save your assessment to persist changes
+1. Navigate to a job's assessment page (Jobs → View assessment)
+2. Create sections and add questions (single, multi, text, long-text, numeric, file stub)
+3. Configure validation (required, max length, numeric min/max) and optional conditional logic
+4. Use the live preview to fill the form; Validate or Save (local) the responses
+5. Click Save to persist the assessment definition to IndexedDB (through MSW)
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 The application uses environment variables for configuration:
@@ -159,7 +144,7 @@ The application uses IndexedDB with the following schema:
 - **Assessment Responses**: Candidate responses to assessments
 - **Timeline Events**: Audit trail for candidate interactions
 
-## 🧪 Testing
+## Testing
 
 The application includes comprehensive error handling and simulated network conditions:
 
@@ -168,7 +153,7 @@ The application includes comprehensive error handling and simulated network cond
 - **Optimistic Updates**: Instant UI updates with rollback on errors
 - **Error Boundaries**: Graceful error handling with user-friendly messages
 
-## 🚀 Performance Optimizations
+## Performance Optimizations
 
 - **Virtual Scrolling**: Efficient rendering of large candidate lists
 - **Query Caching**: Intelligent data caching with TanStack Query
@@ -176,7 +161,7 @@ The application includes comprehensive error handling and simulated network cond
 - **Optimistic Updates**: Instant UI feedback for better UX
 - **Debounced Search**: Efficient search with minimal API calls
 
-## 🔮 Future Enhancements
+## Future Enhancements
 
 ### Planned Features
 - **Conditional Questions**: Full implementation of conditional logic in assessments
@@ -194,7 +179,7 @@ The application includes comprehensive error handling and simulated network cond
 - **Accessibility**: Enhanced WCAG compliance
 - **PWA Features**: Offline support and mobile app capabilities
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -202,11 +187,11 @@ The application includes comprehensive error handling and simulated network cond
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with modern React patterns and best practices
 - Inspired by leading hiring platforms and ATS systems

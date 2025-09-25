@@ -1,4 +1,4 @@
-import type { Assessment, Candidate, Job, TimelineEvent } from '../api/db';
+import type { Assessment, Candidate, Job, TimelineEvent, AssessmentResponse } from '../api/db';
 
 // Shared types
 export type PaginatedResponse<T> = {
@@ -123,6 +123,15 @@ export const api = {
             body: JSON.stringify(assessment)
         });
         return handleResponse<Assessment>(response);
+    },
+
+    async submitAssessment(jobId: string, payload: { candidateId: string; responses: Record<string, any> }): Promise<AssessmentResponse> {
+        const response = await fetch(`/api/assessments/${jobId}/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        return handleResponse<AssessmentResponse>(response);
     },
 };
 

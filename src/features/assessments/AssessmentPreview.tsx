@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { type Assessment, type AssessmentQuestion } from '../../lib/api';
+import { api, type Assessment, type AssessmentQuestion } from '../../lib/api';
 
 interface AssessmentPreviewProps {
     assessment: Assessment;
@@ -159,6 +159,8 @@ function QuestionPreview({ question, answers, onAnswer }: { question: Assessment
 export default function AssessmentPreview({ assessment }: AssessmentPreviewProps) {
     const [answers, setAnswers] = useState<Record<string, any>>({});
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [submitting, setSubmitting] = useState(false);
+    const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
     const isVisible = (q: AssessmentQuestion): boolean => {
         const logic = q.conditionalLogic;
@@ -220,6 +222,25 @@ export default function AssessmentPreview({ assessment }: AssessmentPreviewProps
             questions: section.questions.filter(isVisible),
         }));
     }, [assessment, answers]);
+
+    const handleValidate = () => validate();
+
+    const handleSubmit = async () => {
+        setSubmitMessage(null);
+        const ok = validate();
+        if (!ok) return;
+        try {
+            setSubmitting(true);
+            // Use a demo candidate id for preview; in runtime pass real id from page
+            const candidateId = 'candidate-preview';
+            await api.submitAssessment(assessment.jobId, { candidateId, responses: answers });
+            setSubmitMessage('Saved locally (preview)');
+        } catch (e: any) {
+            setSubmitMessage('Failed to save');
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     return (
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -286,13 +307,24 @@ export default function AssessmentPreview({ assessment }: AssessmentPreviewProps
                     {/* Submit Button */}
                     {visibleSections.length > 0 && visibleSections.some(s => s.questions.length > 0) && (
                         <div className="pt-6 border-t border-gray-200">
-                            <button
-                                onClick={() => validate()}
-                                className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-                            >
-                                Validate Assessment (Preview)
-                            </button>
-                            <p className="mt-2 text-xs text-gray-500 text-center">Preview mode does not submit responses.</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button
+                                    onClick={handleValidate}
+                                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-gray-600 hover:bg-gray-700"
+                                >
+                                    Validate
+                                </button>
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={submitting}
+                                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
+                                >
+                                    {submitting ? 'Saving…' : 'Save (Local)'}
+                                </button>
+                            </div>
+                            {submitMessage && (
+                                <p className="mt-2 text-xs text-gray-500 text-center">{submitMessage}</p>
+                            )}
                         </div>
                     )}
                 </div>

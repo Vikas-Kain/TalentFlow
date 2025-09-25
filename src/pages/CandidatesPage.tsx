@@ -3,22 +3,21 @@ import { useQuery } from '@tanstack/react-query';
 import { MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { api } from '../lib/api';
 import CandidatesKanban from '../features/candidates/CandidatesKanban';
-// If list view component exists, import it; else keep only Kanban
-// import CandidatesListVirtual from '../features/candidates/CandidatesListVirtual';
 
 export default function CandidatesPage() {
-    const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
     const [search, setSearch] = useState('');
+    // The stage filter is kept for the UI, but it will not filter the data sent to the Kanban board.
     const [stageFilter, setStageFilter] = useState('');
 
+    // Corrected: Fetch ALL candidates from the API.
+    // The query key and function no longer depend on the stageFilter.
     const { data: candidatesResponse, isLoading, error } = useQuery({
-        // The query key should only depend on the server-side filter
-        queryKey: ['candidates', { stage: stageFilter }],
-        // The API call should not include the client-side search term
-        queryFn: () => api.getCandidates({ stage: stageFilter }),
+        queryKey: ['candidates'],
+        queryFn: () => api.getCandidates({}),
     });
 
-    // useMemo will re-compute the filtered list only when data or search term changes
+    // Corrected: Apply only the client-side search filter.
+    // The Kanban board needs all candidates to manage dragging between all possible stages.
     const filteredCandidates = useMemo(() => {
         const candidatesData = candidatesResponse?.data || [];
         if (!search) return candidatesData;
@@ -80,7 +79,7 @@ export default function CandidatesPage() {
                             setSearch('');
                             setStageFilter('');
                         }}
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                        className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                     >
                         <FunnelIcon className="-ml-1 mr-2 h-5 w-5" />
                         Clear Filters
@@ -88,34 +87,11 @@ export default function CandidatesPage() {
                 </div>
             </div>
 
-            {/* View Mode Toggle */}
-            <div className="flex space-x-2">
-                <button
-                    onClick={() => setViewMode('kanban')}
-                    className={`flex-1 px-4 py-2 rounded-md font-medium text-sm focus:outline-none transition-all ${viewMode === 'kanban'
-                        ? 'bg-primary-600 text-white shadow-md'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                        }`}
-                >
-                    Kanban View
-                </button>
-                <button
-                    onClick={() => setViewMode('list')}
-                    className={`flex-1 px-4 py-2 rounded-md font-medium text-sm focus:outline-none transition-all ${viewMode === 'list'
-                        ? 'bg-primary-600 text-white shadow-md'
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
-                        }`}
-                >
-                    List View
-                </button>
-            </div>
-
+            {/* Kanban Board */}
             {isLoading ? (
                 <div className="text-center p-6"><p>Loading candidates...</p></div>
-            ) : viewMode === 'kanban' ? (
-                <CandidatesKanban candidates={filteredCandidates} />
             ) : (
-                <div className="text-center text-gray-500 p-6">List view component not available.</div>
+                <CandidatesKanban candidates={filteredCandidates} />
             )}
         </div>
     );

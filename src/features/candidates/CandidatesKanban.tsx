@@ -3,24 +3,21 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     DndContext,
     closestCenter,
-    KeyboardSensor,
     PointerSensor,
     useSensor,
     useSensors,
-    type DragEndEvent,
     type DragStartEvent,
+    type DragEndEvent,
     DragOverlay,
     useDroppable,
 } from '@dnd-kit/core';
 import {
     SortableContext,
-    sortableKeyboardCoordinates,
+    useSortable,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Link } from 'react-router-dom';
-import { EyeIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { PencilIcon } from '@heroicons/react/24/solid';
 import { api, type Candidate } from '../../lib/api';
 import toast from 'react-hot-toast';
 
@@ -37,6 +34,11 @@ const stages = [
     { id: 'rejected', name: 'Rejected' },
 ];
 
+// Define the shape of the API response object for type safety in React Query cache
+interface CandidatesResponse {
+    data: Candidate[];
+}
+
 function CandidateCard({ candidate, isOverlay = false }: { candidate: Candidate, isOverlay?: boolean }) {
     const {
         attributes,
@@ -45,55 +47,29 @@ function CandidateCard({ candidate, isOverlay = false }: { candidate: Candidate,
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: candidate.id, data: { type: 'Candidate', candidate } });
+    } = useSortable({
+        id: candidate.id,
+        // Add explicit data for better event handling
+        data: { type: 'item', candidate },
+    });
 
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        opacity: isDragging ? 0.5 : 1,
+        opacity: isDragging && !isOverlay ? 0.5 : 1,
     };
 
     const cardClasses = `bg-white p-3 rounded-lg shadow-sm border border-gray-200 transition-shadow ${isOverlay ? 'shadow-xl cursor-grabbing' : 'hover:shadow-md cursor-grab active:cursor-grabbing'}`;
 
     return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            {...attributes}
-            {...listeners}
-            className={cardClasses}
-        >
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={cardClasses}>
             <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                    <h4 className="text-sm font-medium text-gray-900 truncate">
-                        {candidate.name}
-                    </h4>
-                    <p className="text-xs text-gray-500 truncate mt-1">
-                        {candidate.email}
-                    </p>
-                    {candidate.phone && (
-                        <p className="text-xs text-gray-500 truncate">
-                            {candidate.phone}
-                        </p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-2">
-                        Applied {new Date(candidate.appliedAt).toLocaleDateString()}
-                    </p>
+                    <p className="text-sm font-medium text-gray-800 truncate">{candidate.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{candidate.email}</p>
                 </div>
-                <div className="flex items-center space-x-1 ml-2">
-                    <Link
-                        to={`/candidates/${candidate.id}`}
-                        className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100"
-                        title="View details"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <EyeIcon className="h-3 w-3" />
-                    </Link>
-                    <button
-                        className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100"
-                        title="Edit candidate"
-                        onClick={(e) => e.stopPropagation()}
-                    >
+                <div className="flex-shrink-0 ml-2">
+                    <button className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100" title="Edit candidate" onClick={(e) => e.stopPropagation()}>
                         <PencilIcon className="h-3 w-3" />
                     </button>
                 </div>
@@ -102,14 +78,31 @@ function CandidateCard({ candidate, isOverlay = false }: { candidate: Candidate,
     );
 }
 
-function DroppableColumn({ id, children }: { id: string; children: ReactNode }) {
-    const { setNodeRef, isOver } = useDroppable({ id });
+function Column({ id, title, children, count, itemIds }: { id: string, title: string, children: ReactNode, count: number, itemIds: string[] }) {
+    const { setNodeRef } = useDroppable({
+        id,
+        // Add explicit data to identify this as a container
+        data: { type: 'container' },
+    });
+
     return (
-        <div
-            ref={setNodeRef}
-            className={`bg-gray-50 rounded-lg p-4 transition-colors ${isOver ? 'ring-2 ring-indigo-400 bg-indigo-50/50' : ''}`}
-        >
-            {children}
+        <div className="bg-gray-50 rounded-lg p-4 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-gray-900">{title}</h3>
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white text-gray-600">
+                    {count}
+                </span>
+            </div>
+            <SortableContext id={id} items={itemIds} strategy={verticalListSortingStrategy}>
+                <div ref={setNodeRef} className="space-y-2 min-h-[200px] flex-grow">
+                    {children}
+                    {count === 0 && (
+                        <div className="border-2 border-dashed border-gray-200 rounded-lg h-full flex items-center justify-center text-gray-400 text-sm">
+                            Drop here
+                        </div>
+                    )}
+                </div>
+            </SortableContext>
         </div>
     );
 }
@@ -125,37 +118,36 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
         }, {} as Record<string, Candidate[]>);
     }, [candidates]);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: { distance: 8 },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
-    );
+    const sensors = useSensors(useSensor(PointerSensor, {
+        activationConstraint: { distance: 8 },
+    }));
 
     const updateCandidateMutation = useMutation<
         Candidate,
         Error,
         { id: string; candidate: Partial<Candidate> },
-        { previousCandidates?: Candidate[] }
+        { previousCandidatesResponse?: CandidatesResponse }
     >({
         mutationFn: ({ id, candidate }) => api.updateCandidate(id, candidate),
         onMutate: async ({ id, candidate }) => {
             await queryClient.cancelQueries({ queryKey: ['candidates'] });
-            const previousCandidates = queryClient.getQueryData<Candidate[]>(['candidates']);
+            const previousCandidatesResponse = queryClient.getQueryData<CandidatesResponse>(['candidates']);
+            
+            queryClient.setQueryData<CandidatesResponse>(['candidates'], (old) => {
+                if (!old || !Array.isArray(old.data)) return old;
+                const updatedData = old.data.map(c => 
+                    c.id === id ? { ...c, ...candidate } : c
+                );
+                return { ...old, data: updatedData };
+            });
 
-            queryClient.setQueryData<Candidate[]>(['candidates'], (old = []) =>
-                old.map(c => (c.id === id ? { ...c, ...candidate } : c))
-            );
-
-            return { previousCandidates };
+            return { previousCandidatesResponse };
         },
-        onError: (_err, _vars, context) => {
-            if (context?.previousCandidates) {
-                queryClient.setQueryData(['candidates'], context.previousCandidates);
+        onError: (err, _vars, context) => {
+            if (context?.previousCandidatesResponse) {
+                queryClient.setQueryData(['candidates'], context.previousCandidatesResponse);
             }
-            toast.error('Failed to update candidate stage.');
+            toast.error(`Failed to move candidate: ${err.message}`);
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['candidates'] });
@@ -163,41 +155,41 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
     });
 
     const handleDragStart = (event: DragStartEvent) => {
-        const { active } = event;
-        const candidate = candidates.find(c => c.id === active.id);
-        if (candidate) {
-            setActiveCandidate(candidate);
-        }
+        const candidate = event.active.data.current?.candidate as Candidate;
+        setActiveCandidate(candidate);
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
         setActiveCandidate(null);
         const { active, over } = event;
 
-        if (!over) {
-            return;
+        if (!over) return;
+
+        const activeContainerId = active.data.current?.sortable?.containerId;
+        
+        // Rectified logic to reliably find the destination container
+        let overContainerId;
+        if (over.data.current?.type === 'container') {
+            // Dropped directly on a column
+            overContainerId = over.id.toString();
+        } else {
+            // Dropped on a card, so get its parent column
+            overContainerId = over.data.current?.sortable?.containerId;
         }
 
-        const activeContainer = active.data.current?.sortable.containerId;
-        const overContainer = over.data.current?.sortable?.containerId ?? over.id;
-
-        if (!activeContainer || !overContainer || activeContainer === overContainer) {
+        if (!activeContainerId || !overContainerId || activeContainerId === overContainerId) {
             return;
         }
         
         const candidateId = active.id.toString();
-        const newStage = overContainer as Candidate['currentStage'];
+        const newStage = overContainerId as Candidate['currentStage'];
         
-        const originalCandidate = active.data.current?.candidate as Candidate | undefined;
-
-        if (originalCandidate && originalCandidate.currentStage !== newStage) {
-            updateCandidateMutation.mutate({
-                id: candidateId,
-                candidate: { currentStage: newStage },
-            });
-        }
+        updateCandidateMutation.mutate({
+            id: candidateId,
+            candidate: { currentStage: newStage },
+        });
     };
-
+    
     return (
         <DndContext
             sensors={sensors}
@@ -207,32 +199,22 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
             onDragCancel={() => setActiveCandidate(null)}
         >
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                {stages.map((stage) => (
-                    <DroppableColumn key={stage.id} id={stage.id}>
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-medium text-gray-900">{stage.name}</h3>
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-white text-gray-600">
-                                {candidatesByStage[stage.id]?.length || 0}
-                            </span>
-                        </div>
-                        <SortableContext
+                {stages.map((stage) => {
+                    const stageCandidates = candidatesByStage[stage.id] || [];
+                    return (
+                        <Column
+                            key={stage.id}
                             id={stage.id}
-                            items={candidatesByStage[stage.id]?.map(c => c.id) || []}
-                            strategy={verticalListSortingStrategy}
+                            title={stage.name}
+                            count={stageCandidates.length}
+                            itemIds={stageCandidates.map(c => c.id)}
                         >
-                            <div className="space-y-2 min-h-[200px]">
-                                {candidatesByStage[stage.id]?.map((candidate) => (
-                                    <CandidateCard key={candidate.id} candidate={candidate} />
-                                ))}
-                                {(!candidatesByStage[stage.id] || candidatesByStage[stage.id].length === 0) && (
-                                    <div className="border-2 border-dashed border-gray-200 rounded-lg text-center py-8 text-gray-400 text-sm">
-                                        Drop here
-                                    </div>
-                                )}
-                            </div>
-                        </SortableContext>
-                    </DroppableColumn>
-                ))}
+                            {stageCandidates.map((candidate) => (
+                                <CandidateCard key={candidate.id} candidate={candidate} />
+                            ))}
+                        </Column>
+                    );
+                })}
             </div>
             <DragOverlay>
                 {activeCandidate ? <CandidateCard candidate={activeCandidate} isOverlay /> : null}
