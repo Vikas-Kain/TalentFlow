@@ -5,15 +5,15 @@ import App from './App.tsx'
 
 // Initialize MSW and seed database
 async function enableMocking() {
-  if (import.meta.env.MODE !== 'development') {
-    return;
-  }
+  // The conditional check has been removed.
+  // The worker will now start in both development and production modes.
 
   const { worker } = await import('./api/msw-browser');
   const { seedDatabase } = await import('./api/db');
 
   // Start MSW worker
   await worker.start({
+    // It's good practice to keep this option for all environments
     onUnhandledRequest: 'bypass',
   });
 
@@ -21,6 +21,7 @@ async function enableMocking() {
   await seedDatabase();
 }
 
+// This part remains the same
 enableMocking().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
