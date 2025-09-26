@@ -2,7 +2,6 @@ import { type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     BriefcaseIcon,
-    UsersIcon,
     Bars3Icon,
     XMarkIcon
 } from '@heroicons/react/24/outline';
@@ -14,7 +13,6 @@ interface LayoutProps {
 
 const navigation = [
     { name: 'Jobs', href: '/jobs', icon: BriefcaseIcon },
-    { name: 'Candidates', href: '/candidates', icon: UsersIcon },
 ];
 
 export default function Layout({ children }: LayoutProps) {

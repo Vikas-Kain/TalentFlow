@@ -72,10 +72,11 @@ export const api = {
         return handleResponse<{ success: boolean }>(response);
     },
 
-    async getCandidates(params: { search?: string; stage?: string; page?: number; pageSize?: number }): Promise<{ data: (Candidate & { stage: Candidate['currentStage'] })[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
+    async getCandidates(params: { search?: string; stage?: string; jobId?: string; page?: number; pageSize?: number }): Promise<{ data: (Candidate & { stage: Candidate['currentStage'] })[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }> {
         const queryParams = new URLSearchParams();
         if (params.search) queryParams.set('search', params.search);
         if (params.stage) queryParams.set('stage', params.stage);
+        if (params.jobId) queryParams.set('jobId', params.jobId);
         if (params.page) queryParams.set('page', String(params.page));
         if (params.pageSize) queryParams.set('pageSize', String(params.pageSize));
 

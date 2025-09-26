@@ -223,6 +223,7 @@ export const handlers = [
         const url = new URL(request.url);
         const search = url.searchParams.get('search') || '';
         const stage = url.searchParams.get('stage') || '';
+        const jobId = url.searchParams.get('jobId') || '';
         const page = parseInt(url.searchParams.get('page') || '1');
         const pageSize = parseInt(url.searchParams.get('pageSize') || '50');
 
@@ -238,6 +239,10 @@ export const handlers = [
 
         if (stage) {
             candidates = candidates.filter(candidate => candidate.currentStage === stage);
+        }
+
+        if (jobId) {
+            candidates = candidates.filter(candidate => candidate.jobId === jobId);
         }
 
         // Apply pagination

@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeftIcon, CalendarIcon, TagIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, CalendarIcon, TagIcon, UsersIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
 import { api } from '../lib/api';
 
 export default function JobDetailPage() {
@@ -67,14 +67,30 @@ export default function JobDetailPage() {
                             <h1 className="text-2xl font-bold text-gray-900">{job.title}</h1>
                             <p className="text-sm text-gray-500 mt-1">/{job.slug}</p>
                         </div>
-                        <span
-                            className={`mt-2 sm:mt-0 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${job.status === 'active'
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                                }`}
-                        >
-                            {job.status}
-                        </span>
+                        <div className="mt-3 sm:mt-0 flex items-center gap-2">
+                            <Link
+                                to={`/jobs/${job.id}/assessment`}
+                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                                <ClipboardDocumentListIcon className="h-4 w-4 mr-1" />
+                                Assessment
+                            </Link>
+                            <Link
+                                to={`/jobs/${job.id}/candidates`}
+                                className="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                            >
+                                <UsersIcon className="h-4 w-4 mr-1" />
+                                Candidates
+                            </Link>
+                            <span
+                                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${job.status === 'active'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                    }`}
+                            >
+                                {job.status}
+                            </span>
+                        </div>
                     </div>
 
                     <div className="mt-4 flex items-center space-x-4 text-sm text-gray-500">
