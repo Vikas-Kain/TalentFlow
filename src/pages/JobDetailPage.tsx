@@ -1,16 +1,37 @@
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftIcon, CalendarIcon, TagIcon, UsersIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
-import { api } from '../lib/api';
+import { api, type Job } from '../lib/api';
+import toast from 'react-hot-toast';
 
 export default function JobDetailPage() {
     const { jobId } = useParams<{ jobId: string }>();
+    const queryClient = useQueryClient();
 
     const { data: job, isLoading, error } = useQuery({
         queryKey: ['job', jobId],
         queryFn: () => api.getJob(jobId!),
         enabled: !!jobId,
     });
+
+    const updateJobMutation = useMutation({
+        mutationFn: ({ id, job }: { id: string; job: Partial<Job> }) =>
+            api.updateJob(id, job),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['job', jobId] });
+            queryClient.invalidateQueries({ queryKey: ['jobs'] });
+            toast.success('Job updated successfully');
+        },
+        onError: (error: any) => {
+            toast.error('Failed to update job');
+            console.error('Update error:', error);
+        },
+    });
+
+    const handleStatusToggle = (job: Job) => {
+        const newStatus = job.status === 'active' ? 'archived' : 'active';
+        updateJobMutation.mutate({ id: job.id, job: { status: newStatus } });
+    };
 
     if (isLoading) {
         return (
@@ -82,6 +103,16 @@ export default function JobDetailPage() {
                                 <UsersIcon className="h-4 w-4 mr-1" />
                                 Candidates
                             </Link>
+                            <button
+                                onClick={() => handleStatusToggle(job)}
+                                disabled={updateJobMutation.isPending}
+                                className={`inline-flex items-center px-3 py-1.5 border border-transparent rounded-md text-sm font-medium text-white ${job.status === 'active'
+                                        ? 'bg-red-600 hover:bg-red-700'
+                                        : 'bg-green-600 hover:bg-green-700'
+                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                                {updateJobMutation.isPending ? 'Updating...' : job.status === 'active' ? 'Archive' : 'Activate'}
+                            </button>
                             <span
                                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${job.status === 'active'
                                     ? 'bg-green-100 text-green-800'
