@@ -17,7 +17,8 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { PencilIcon } from '@heroicons/react/24/solid';
+import { EyeIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
 import { api, type Candidate } from '../../lib/api';
 import toast from 'react-hot-toast';
 
@@ -69,9 +70,14 @@ function CandidateCard({ candidate, isOverlay = false }: { candidate: Candidate,
                     <p className="text-xs text-gray-500 truncate">{candidate.email}</p>
                 </div>
                 <div className="flex-shrink-0 ml-2">
-                    <button className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100" title="Edit candidate" onClick={(e) => e.stopPropagation()}>
-                        <PencilIcon className="h-3 w-3" />
-                    </button>
+                    <Link
+                        to={`/candidates/${candidate.id}`}
+                        className="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100"
+                        title="View candidate details"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <EyeIcon className="h-3 w-3" />
+                    </Link>
                 </div>
             </div>
         </div>
@@ -132,10 +138,10 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
         onMutate: async ({ id, candidate }) => {
             await queryClient.cancelQueries({ queryKey: ['candidates'] });
             const previousCandidatesResponse = queryClient.getQueryData<CandidatesResponse>(['candidates']);
-            
+
             queryClient.setQueryData<CandidatesResponse>(['candidates'], (old) => {
                 if (!old || !Array.isArray(old.data)) return old;
-                const updatedData = old.data.map(c => 
+                const updatedData = old.data.map(c =>
                     c.id === id ? { ...c, ...candidate } : c
                 );
                 return { ...old, data: updatedData };
@@ -166,7 +172,7 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
         if (!over) return;
 
         const activeContainerId = active.data.current?.sortable?.containerId;
-        
+
         // Rectified logic to reliably find the destination container
         let overContainerId;
         if (over.data.current?.type === 'container') {
@@ -180,16 +186,16 @@ export default function CandidatesKanban({ candidates }: CandidatesKanbanProps) 
         if (!activeContainerId || !overContainerId || activeContainerId === overContainerId) {
             return;
         }
-        
+
         const candidateId = active.id.toString();
         const newStage = overContainerId as Candidate['currentStage'];
-        
+
         updateCandidateMutation.mutate({
             id: candidateId,
             candidate: { currentStage: newStage },
         });
     };
-    
+
     return (
         <DndContext
             sensors={sensors}

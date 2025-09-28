@@ -6,8 +6,9 @@ import { Toaster } from 'react-hot-toast';
 // Pages
 import JobsPage from './pages/JobsPage';
 import JobDetailPage from './pages/JobDetailPage';
-// (Removed global candidates pages)
+import CandidatesPage from './pages/CandidatesPage';
 import JobCandidatesPage from './pages/JobCandidatesPage';
+import CandidateProfilePage from './pages/CandidateProfilePage';
 import AssessmentPage from './pages/AssessmentPage';
 
 // Components
@@ -38,6 +39,8 @@ function App() {
                   <Route path="jobs/:jobId" element={<JobDetailPage />} />
                   <Route path="jobs/:jobId/assessment" element={<AssessmentPage />} />
                   <Route path="jobs/:jobId/candidates" element={<JobCandidatesPage />} />
+                  <Route path="candidates" element={<CandidatesPage />} />
+                  <Route path="candidates/:candidateId" element={<CandidateProfilePage />} />
                 </Routes>
               </ErrorBoundary>
             </Layout>

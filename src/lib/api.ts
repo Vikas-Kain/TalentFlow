@@ -84,9 +84,9 @@ export const api = {
         return handleResponse(response);
     },
 
-    async getCandidate(id: string): Promise<Candidate> {
+    async getCandidate(id: string): Promise<Candidate & { stage: Candidate['currentStage'] }> {
         const response = await fetch(`/api/candidates/${id}`);
-        return handleResponse<Candidate>(response);
+        return handleResponse<Candidate & { stage: Candidate['currentStage'] }>(response);
     },
 
     async updateCandidate(id: string, candidate: Partial<Candidate> & { stage?: Candidate['currentStage'] }): Promise<Candidate & { stage: Candidate['currentStage'] }> {

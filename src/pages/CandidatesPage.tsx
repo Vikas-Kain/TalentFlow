@@ -1,36 +1,39 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
-import { api } from '../lib/api';
+import { MagnifyingGlassIcon, FunnelIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
+import { api, type Candidate } from '../lib/api';
 import CandidatesKanban from '../features/candidates/CandidatesKanban';
+import CandidatesList from '../features/candidates/CandidatesList';
 
 export default function CandidatesPage() {
+    const [view, setView] = useState<'list' | 'kanban'>('kanban');
     const [search, setSearch] = useState('');
-    // The stage filter is kept for the UI, but it will not filter the data sent to the Kanban board.
     const [stageFilter, setStageFilter] = useState('');
 
-    // Corrected: Fetch ALL candidates from the API.
-    // The query key and function no longer depend on the stageFilter.
-    const { data: candidatesResponse, isLoading, error } = useQuery({
-        queryKey: ['candidates'],
-        queryFn: () => api.getCandidates({}),
+    const { data: candidatesResp, isLoading, error } = useQuery({
+        queryKey: ['candidates', { stage: stageFilter }],
+        queryFn: () => api.getCandidates({ stage: stageFilter, page: 1, pageSize: 1000 }),
     });
 
-    // Corrected: Apply only the client-side search filter.
-    // The Kanban board needs all candidates to manage dragging between all possible stages.
-    const filteredCandidates = useMemo(() => {
-        const candidatesData = candidatesResponse?.data || [];
-        if (!search) return candidatesData;
+    const candidates = candidatesResp?.data || [];
 
-        const lowercasedSearch = search.toLowerCase();
-        return candidatesData.filter(candidate =>
-            candidate.name.toLowerCase().includes(lowercasedSearch) ||
-            candidate.email.toLowerCase().includes(lowercasedSearch)
+    // Client-side search filtering
+    const filteredCandidates = useMemo(() => {
+        if (!search.trim()) return candidates;
+
+        const searchLower = search.toLowerCase();
+        return candidates.filter((candidate: Candidate & { stage: Candidate['currentStage'] }) =>
+            candidate.name.toLowerCase().includes(searchLower) ||
+            candidate.email.toLowerCase().includes(searchLower)
         );
-    }, [candidatesResponse, search]);
+    }, [candidates, search]);
 
     if (error) {
-        return <div className="text-center py-12 text-red-600">Error: {error.message}</div>;
+        return (
+            <div className="text-center py-12">
+                <p className="text-red-600">Error loading candidates: {error.message}</p>
+            </div>
+        );
     }
 
     return (
@@ -41,6 +44,33 @@ export default function CandidatesPage() {
                     <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
                         Candidates
                     </h2>
+                </div>
+                <div className="mt-4 flex items-center space-x-3 md:mt-0 md:ml-4">
+                    {/* View Toggle */}
+                    <div className="flex rounded-md shadow-sm" role="group">
+                        <button
+                            type="button"
+                            onClick={() => setView('kanban')}
+                            className={`inline-flex items-center px-3 py-2 text-sm font-medium border ${view === 'kanban'
+                                    ? 'bg-primary-600 text-white border-primary-600'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                } rounded-l-md`}
+                        >
+                            <Squares2X2Icon className="h-4 w-4 mr-1" />
+                            Kanban
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setView('list')}
+                            className={`inline-flex items-center px-3 py-2 text-sm font-medium border ${view === 'list'
+                                    ? 'bg-primary-600 text-white border-primary-600'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                                } rounded-r-md`}
+                        >
+                            <ListBulletIcon className="h-4 w-4 mr-1" />
+                            List
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -79,7 +109,7 @@ export default function CandidatesPage() {
                             setSearch('');
                             setStageFilter('');
                         }}
-                        className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                     >
                         <FunnelIcon className="-ml-1 mr-2 h-5 w-5" />
                         Clear Filters
@@ -87,11 +117,28 @@ export default function CandidatesPage() {
                 </div>
             </div>
 
-            {/* Kanban Board */}
+            {/* Content */}
             {isLoading ? (
-                <div className="text-center p-6"><p>Loading candidates...</p></div>
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                    <div className="p-6 text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                        <p className="mt-2 text-gray-500">Loading candidates...</p>
+                    </div>
+                </div>
+            ) : filteredCandidates.length === 0 ? (
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                    <div className="p-6 text-center">
+                        <p className="text-gray-500">No candidates found</p>
+                    </div>
+                </div>
             ) : (
-                <CandidatesKanban candidates={filteredCandidates} />
+                <>
+                    {view === 'kanban' ? (
+                        <CandidatesKanban candidates={filteredCandidates} />
+                    ) : (
+                        <CandidatesList candidates={filteredCandidates} />
+                    )}
+                </>
             )}
         </div>
     );

@@ -107,8 +107,8 @@ export default function JobDetailPage() {
                                 onClick={() => handleStatusToggle(job)}
                                 disabled={updateJobMutation.isPending}
                                 className={`inline-flex items-center px-3 py-1.5 border border-transparent rounded-md text-sm font-medium text-white ${job.status === 'active'
-                                        ? 'bg-red-600 hover:bg-red-700'
-                                        : 'bg-green-600 hover:bg-green-700'
+                                    ? 'bg-red-600 hover:bg-red-700'
+                                    : 'bg-green-600 hover:bg-green-700'
                                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
                                 {updateJobMutation.isPending ? 'Updating...' : job.status === 'active' ? 'Archive' : 'Activate'}

@@ -371,7 +371,23 @@ export const handlers = [
         return HttpResponse.json(timelineEvent, { status: 201 });
     }),
 
+    http.get('/api/candidates/:id', async ({ params }) => {
+        await delay(100 + Math.random() * 300);
+        const { id } = params;
+        const candidate = await db.candidates.get(id as string);
+
+        if (!candidate) {
+            return HttpResponse.json(
+                { error: 'Candidate not found' },
+                { status: 404 }
+            );
+        }
+
+        return HttpResponse.json({ ...candidate, stage: candidate.currentStage });
+    }),
+
     http.get('/api/candidates/:id/timeline', async ({ params }) => {
+        await delay(100 + Math.random() * 300);
         const { id } = params;
         const events = await db.timelineEvents
             .where('candidateId')

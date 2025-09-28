@@ -9,20 +9,27 @@ A modern, full-featured hiring platform built with React, TypeScript, and cuttin
 - **CRUD Operations**: Create, read, update, and archive jobs with real-time validation
 - **Advanced Filtering**: Search by title, filter by status, and sort by various criteria
 - **Pagination**: Efficient handling of large job lists with server-side pagination simulation
+- **Job-Specific Features**: Each job has its own candidates kanban board and assessment builder
+- **Activate/Archive**: Toggle job status directly from job detail pages
 
 ### Candidates Management
-- **Kanban Board**: Visual candidate pipeline with drag-and-drop stage management (single view)
-- **High-volume Data**: 1,000+ seeded candidates with client search and stage filtering
+- **Dual View System**: Switch between Kanban board and virtualized list views
+- **High-Performance List**: Virtualized rendering for 1000+ candidates with TanStack Virtual
+- **Kanban Board**: Visual candidate pipeline with drag-and-drop stage management
+- **Global & Job-Specific Views**: Access all candidates or filter by specific job
+- **Advanced Filtering**: Server-side stage filtering and client-side search
 - **Detailed Profiles**: Comprehensive candidate information with timeline tracking
-- **Notes System**: Add notes with @mentions (rendered) and local suggestions
+- **Notes System**: Add notes with @mentions (highlighted and rendered)
+- **Timeline Tracking**: Complete audit trail of candidate interactions and stage changes
 
 ### Assessment Builder
 - **Live Preview**: Side-by-side builder and preview for real-time assessment creation
-- **Multiple Question Types**: Single-choice, multi-choice, short text, long text, numeric (min/max), and a file upload stub
+- **Multiple Question Types**: Single-choice, multi-choice, short text, long text, numeric (min/max), and file upload stub
 - **Drag-and-Drop**: Reorder sections and questions with visual feedback
 - **Validation Rules**: Required fields, max length, numeric ranges enforced at runtime
-- **Conditional Logic**: Show/hide questions based on prior answers (e.g. show QX if QY === "Yes")
-- **Local Persistence**: Builder state and candidate responses are stored in IndexedDB (via MSW + Dexie)
+- **Conditional Logic**: Show/hide questions based on prior answers
+- **Local Persistence**: Builder state and candidate responses stored in IndexedDB
+- **Job-Specific**: Each job has its own assessment builder
 
 ## 🛠 Technology Stack
 
@@ -54,6 +61,44 @@ A modern, full-featured hiring platform built with React, TypeScript, and cuttin
 
 ## 🏗 Architecture & Technical Decisions
 
+### Application Structure
+The application follows a feature-based architecture with clear separation of concerns:
+
+```
+src/
+├── api/                    # Data layer (MSW + Dexie)
+│   ├── db.ts              # Database schema and seeding
+│   ├── handlers.ts        # MSW API handlers
+│   └── msw-browser.ts     # MSW browser setup
+├── components/            # Shared UI components
+│   ├── Layout.tsx         # Main application layout
+│   ├── ErrorBoundary.tsx  # Error handling
+│   └── LoadingSkeleton.tsx # Loading states
+├── features/              # Feature-specific components
+│   ├── jobs/              # Job management components
+│   ├── candidates/        # Candidate management components
+│   └── assessments/       # Assessment builder components
+├── pages/                 # Top-level page components
+│   ├── JobsPage.tsx       # Jobs listing and management
+│   ├── JobDetailPage.tsx  # Individual job details
+│   ├── CandidatesPage.tsx # Global candidates view
+│   ├── JobCandidatesPage.tsx # Job-specific candidates
+│   ├── CandidateProfilePage.tsx # Individual candidate profile
+│   └── AssessmentPage.tsx # Assessment builder
+├── lib/                   # Utilities and API client
+│   └── api.ts            # Centralized API functions
+└── store/                # Global state management
+    └── ui.ts             # UI state (Zustand)
+```
+
+### Routing Structure
+- `/` → Redirects to `/jobs`
+- `/jobs` → Jobs listing page
+- `/jobs/:jobId` → Job detail page with Assessment and Candidates buttons
+- `/jobs/:jobId/assessment` → Job-specific assessment builder
+- `/jobs/:jobId/candidates` → Job-specific candidates kanban
+- `/candidates` → Global candidates page (Kanban/List toggle)
+- `/candidates/:candidateId` → Individual candidate profile
 
 ### Why These Technologies?
 
@@ -110,20 +155,26 @@ A modern, full-featured hiring platform built with React, TypeScript, and cuttin
 3. Filter by status (Active/Archived) or sort by different criteria
 4. Drag and drop jobs to reorder them
 5. Click "New Job" to create a new position
-6. Use the action buttons to view details, edit, or archive jobs
+6. Click on any job to view details, assessment builder, and candidates
+7. Use Activate/Archive buttons on job detail pages to change status
 
 ### Candidates Management
-1. Go to the Candidates page to see all applicants (Kanban only)
-2. Drag candidates between stages to update their status (optimistic with rollback)
-3. Use the search bar to find specific candidates; filter by stage
-4. Click on a candidate to view the profile, timeline, and add notes with @mentions
+1. **Global View**: Go to the Candidates page to see all applicants
+2. **Job-Specific View**: Navigate to Jobs → [Job] → Candidates for job-specific candidates
+3. **View Toggle**: Switch between Kanban board and virtualized list views
+4. **Filtering**: Use stage dropdown for server-side filtering, search bar for client-side search
+5. **Drag & Drop**: Drag candidates between stages to update their status (optimistic with rollback)
+6. **Candidate Profiles**: Click on any candidate to view detailed profile with timeline
+7. **Notes & Mentions**: Add notes with @mentions that are highlighted and rendered
+8. **Timeline**: View complete audit trail of candidate interactions and stage changes
 
 ### Assessment Builder
-1. Navigate to a job's assessment page (Jobs → View assessment)
+1. Navigate to a job's assessment page (Jobs → [Job] → Assessment)
 2. Create sections and add questions (single, multi, text, long-text, numeric, file stub)
-3. Configure validation (required, max length, numeric min/max) and optional conditional logic
-4. Use the live preview to fill the form; Validate or Save (local) the responses
-5. Click Save to persist the assessment definition to IndexedDB (through MSW)
+3. Configure validation (required, max length, numeric min/max) and conditional logic
+4. Use drag-and-drop to reorder sections and questions
+5. Use the live preview to test the assessment
+6. Click Save to persist the assessment definition to IndexedDB
 
 ## Configuration
 
@@ -138,11 +189,12 @@ VITE_MSW_ENABLED=true
 ### Database Schema
 The application uses IndexedDB with the following schema:
 
-- **Jobs**: Job postings with metadata and ordering
-- **Candidates**: Applicant information and current stage
-- **Assessments**: Assessment definitions with sections and questions
+- **Jobs**: Job postings with metadata, ordering, and status
+- **Candidates**: Applicant information, current stage, and job association
+- **Assessments**: Assessment definitions with sections and questions (job-specific)
 - **Assessment Responses**: Candidate responses to assessments
-- **Timeline Events**: Audit trail for candidate interactions
+- **Timeline Events**: Complete audit trail for candidate interactions and stage changes
+- **Notes**: Candidate notes with @mentions and metadata
 
 ## Testing
 
@@ -155,22 +207,27 @@ The application includes comprehensive error handling and simulated network cond
 
 ## Performance Optimizations
 
-- **Virtual Scrolling**: Efficient rendering of large candidate lists
+- **Virtual Scrolling**: Efficient rendering of 1000+ candidates with TanStack Virtual
 - **Query Caching**: Intelligent data caching with TanStack Query
 - **Code Splitting**: Lazy loading of route components
-- **Optimistic Updates**: Instant UI feedback for better UX
-- **Debounced Search**: Efficient search with minimal API calls
+- **Optimistic Updates**: Instant UI feedback for better UX with rollback on errors
+- **Dual Search Strategy**: Server-side filtering for stages, client-side for names/emails
+- **Efficient Re-renders**: Minimal re-renders with proper React Query cache invalidation
+- **Drag & Drop Performance**: Smooth interactions with dnd-kit and optimistic updates
 
 ## Future Enhancements
 
 ### Planned Features
-- **Conditional Questions**: Full implementation of conditional logic in assessments
+- **Advanced Conditional Logic**: Enhanced conditional questions in assessments
 - **File Upload**: Complete file upload functionality for assessments
 - **Email Integration**: Send emails to candidates directly from the platform
 - **Analytics Dashboard**: Insights into hiring metrics and candidate flow
 - **Bulk Operations**: Mass actions for candidates and jobs
 - **Advanced Search**: Full-text search with filters and sorting
 - **Export Functionality**: Export candidate data and assessment results
+- **Real-time Collaboration**: Multiple users working on the same candidate
+- **Advanced Timeline**: Rich timeline with file attachments and comments
+- **Assessment Analytics**: Detailed insights into assessment performance
 
 ### Technical Improvements
 - **Unit Testing**: Comprehensive test coverage with Jest and React Testing Library
