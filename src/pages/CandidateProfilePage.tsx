@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftIcon, CalendarIcon, PhoneIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
-import { api, type Candidate, type TimelineEvent } from '../lib/api';
+import { api } from '../lib/api';
 import toast from 'react-hot-toast';
 
 const stages = [

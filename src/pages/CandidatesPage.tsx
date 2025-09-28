@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { MagnifyingGlassIcon, FunnelIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { api, type Candidate } from '../lib/api';
 import CandidatesKanban from '../features/candidates/CandidatesKanban';
-import CandidatesList from '../features/candidates/CandidatesList';
+import CandidatesList from '../features/candidates/CandidatesList.tsx';
 
 export default function CandidatesPage() {
     const [view, setView] = useState<'list' | 'kanban'>('kanban');
